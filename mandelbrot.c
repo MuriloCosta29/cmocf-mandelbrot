@@ -1,3 +1,4 @@
+#include <_time.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h> // atoi(), strtol()
@@ -30,6 +31,13 @@ int main(int argc, char *argv[]) {
   p1.altura = atoi(argv[2]);
   if (p1.altura <= 0) {
     fprintf(stderr, "Altura: tem que ser maior que 0\n");
+    return 1;
+  }
+
+  int *buffer = malloc(p1.altura * p1.largura * sizeof(int));
+
+  if (buffer == NULL) {
+    fprintf(stderr, "Erro ao alocar memória");
     return 1;
   }
 
