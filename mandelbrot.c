@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <limits.h>
+#include <omp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #endif
 
 #define SERIAL_FILE "mandelbrot_" LOGIN "_serial.pgm"
+#define OPENMP_FILE "mandelbrot_" LOGIN "_openmp.pgm"
 
 int width;
 int height;
@@ -83,6 +85,17 @@ void calculate_serial(void) {
   }
 }
 
+void calculate_openmp(void) {
+  int row;
+
+  omp_set_num_threads(number_of_threads);
+
+#pragma omp parallel for
+  for (row = 0; row < height; row++) {
+    calculate_row(row);
+  }
+}
+
 int write_image(const char *filename) {
   FILE *file = fopen(filename, "w");
   int row;
@@ -145,6 +158,12 @@ int main(int argc, char *argv[]) {
 
   calculate_serial();
   if (!write_image(SERIAL_FILE)) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  calculate_openmp();
+  if (!write_image(OPENMP_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
