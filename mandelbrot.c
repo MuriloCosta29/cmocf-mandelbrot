@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <omp.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,11 @@
 
 #define SERIAL_FILE "mandelbrot_" LOGIN "_serial.pgm"
 #define OPENMP_FILE "mandelbrot_" LOGIN "_openmp.pgm"
+#define PTHREADS1_FILE "mandelbrot_" LOGIN "_pthreads1.pgm"
+
+typedef struct {
+  int id;
+} ThreadData;
 
 int width;
 int height;
@@ -96,6 +102,66 @@ void calculate_openmp(void) {
   }
 }
 
+void *pthread_worker_blocks(void *argument) {
+  ThreadData *data = argument;
+  int first_row = data->id * height / number_of_threads;
+  int last_row = (data->id + 1) * height / number_of_threads;
+  int row;
+
+  for (row = first_row; row < last_row; row++) {
+    calculate_row(row);
+  }
+
+  return NULL;
+}
+
+int calculate_pthreads_blocks(void) {
+  pthread_t *threads;
+  ThreadData *data;
+  int created = 0;
+  int success = 1;
+  int i;
+
+  if ((size_t)number_of_threads > SIZE_MAX / sizeof(pthread_t) ||
+      (size_t)number_of_threads > SIZE_MAX / sizeof(ThreadData)) {
+    save_error("Erro: o numero de threads e muito grande.");
+    return 0;
+  }
+
+  threads = malloc((size_t)number_of_threads * sizeof(pthread_t));
+  data = malloc((size_t)number_of_threads * sizeof(ThreadData));
+
+  if (threads == NULL || data == NULL) {
+    save_error("Erro ao alocar memoria para as threads.");
+    free(threads);
+    free(data);
+    return 0;
+  }
+
+  for (i = 0; i < number_of_threads; i++) {
+    data[i].id = i;
+
+    if (pthread_create(&threads[i], NULL, pthread_worker_blocks, &data[i]) !=
+        0) {
+      save_error("Erro ao criar uma thread.");
+      success = 0;
+      break;
+    }
+    created++;
+  }
+
+  for (i = 0; i < created; i++) {
+    if (pthread_join(threads[i], NULL) != 0) {
+      save_error("Erro ao aguardar uma thread.");
+      success = 0;
+    }
+  }
+
+  free(threads);
+  free(data);
+  return success;
+}
+
 int write_image(const char *filename) {
   FILE *file = fopen(filename, "w");
   int row;
@@ -164,6 +230,15 @@ int main(int argc, char *argv[]) {
 
   calculate_openmp();
   if (!write_image(OPENMP_FILE)) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  if (!calculate_pthreads_blocks()) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+  if (!write_image(PTHREADS1_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
