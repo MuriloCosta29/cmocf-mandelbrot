@@ -13,9 +13,11 @@
 #define SERIAL_FILE "mandelbrot_" LOGIN "_serial.pgm"
 #define OPENMP_FILE "mandelbrot_" LOGIN "_openmp.pgm"
 #define PTHREADS1_FILE "mandelbrot_" LOGIN "_pthreads1.pgm"
+#define PTHREADS2_FILE "mandelbrot_" LOGIN "_pthreads2.pgm"
 
 typedef struct {
   int id;
+  int interleaved;
 } ThreadData;
 
 int width;
@@ -102,20 +104,31 @@ void calculate_openmp(void) {
   }
 }
 
-void *pthread_worker_blocks(void *argument) {
+void *pthread_worker(void *argument) {
   ThreadData *data = argument;
-  int first_row = data->id * height / number_of_threads;
-  int last_row = (data->id + 1) * height / number_of_threads;
+  int first_row;
+  int last_row;
+  int step;
   int row;
 
-  for (row = first_row; row < last_row; row++) {
+  if (data->interleaved) {
+    first_row = data->id;
+    last_row = height;
+    step = number_of_threads;
+  } else {
+    first_row = data->id * height / number_of_threads;
+    last_row = (data->id + 1) * height / number_of_threads;
+    step = 1;
+  }
+
+  for (row = first_row; row < last_row; row += step) {
     calculate_row(row);
   }
 
   return NULL;
 }
 
-int calculate_pthreads_blocks(void) {
+int calculate_pthreads(int interleaved) {
   pthread_t *threads;
   ThreadData *data;
   int created = 0;
@@ -140,9 +153,9 @@ int calculate_pthreads_blocks(void) {
 
   for (i = 0; i < number_of_threads; i++) {
     data[i].id = i;
+    data[i].interleaved = interleaved;
 
-    if (pthread_create(&threads[i], NULL, pthread_worker_blocks, &data[i]) !=
-        0) {
+    if (pthread_create(&threads[i], NULL, pthread_worker, &data[i]) != 0) {
       save_error("Erro ao criar uma thread.");
       success = 0;
       break;
@@ -234,11 +247,20 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  if (!calculate_pthreads_blocks()) {
+  if (!calculate_pthreads(0)) {
     free(image);
     return EXIT_FAILURE;
   }
   if (!write_image(PTHREADS1_FILE)) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  if (!calculate_pthreads(1)) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+  if (!write_image(PTHREADS2_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
