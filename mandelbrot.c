@@ -207,6 +207,10 @@ int write_image(const char *filename) {
 }
 
 int main(int argc, char *argv[]) {
+  double times[4];
+  double start;
+  FILE *times_file;
+
   error_file = fopen("errors.txt", "w");
   if (error_file == NULL) {
     return EXIT_FAILURE;
@@ -235,32 +239,63 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  start = omp_get_wtime();
   calculate_serial();
+  times[0] = omp_get_wtime() - start;
   if (!write_image(SERIAL_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
 
+  start = omp_get_wtime();
   calculate_openmp();
+  times[1] = omp_get_wtime() - start;
   if (!write_image(OPENMP_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
 
+  start = omp_get_wtime();
   if (!calculate_pthreads(0)) {
     free(image);
     return EXIT_FAILURE;
   }
+  times[2] = omp_get_wtime() - start;
   if (!write_image(PTHREADS1_FILE)) {
     free(image);
     return EXIT_FAILURE;
   }
 
+  start = omp_get_wtime();
   if (!calculate_pthreads(1)) {
     free(image);
     return EXIT_FAILURE;
   }
+  times[3] = omp_get_wtime() - start;
   if (!write_image(PTHREADS2_FILE)) {
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  times_file = fopen("times.txt", "w");
+  if (times_file == NULL) {
+    save_error("Erro ao criar times.txt.");
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  if (fprintf(times_file, "Serial: %.9f segundos\n", times[0]) < 0 ||
+      fprintf(times_file, "OpenMP: %.9f segundos\n", times[1]) < 0 ||
+      fprintf(times_file, "Pthreads 1: %.9f segundos\n", times[2]) < 0 ||
+      fprintf(times_file, "Pthreads 2: %.9f segundos\n", times[3]) < 0) {
+    save_error("Erro ao escrever em times.txt.");
+    fclose(times_file);
+    free(image);
+    return EXIT_FAILURE;
+  }
+
+  if (fclose(times_file) != 0) {
+    save_error("Erro ao fechar times.txt.");
     free(image);
     return EXIT_FAILURE;
   }
