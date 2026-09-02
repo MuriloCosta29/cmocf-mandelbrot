@@ -17,7 +17,6 @@
 
 typedef struct {
   int id;
-  int interleaved;
 } ThreadData;
 
 int width;
@@ -104,24 +103,27 @@ void calculate_openmp(void) {
   }
 }
 
-void *pthread_worker(void *argument) {
+void *pthread_worker_blocks(void *argument) {
   ThreadData *data = argument;
   int first_row;
   int last_row;
-  int step;
   int row;
 
-  if (data->interleaved) {
-    first_row = data->id;
-    last_row = height;
-    step = number_of_threads;
-  } else {
-    first_row = data->id * height / number_of_threads;
-    last_row = (data->id + 1) * height / number_of_threads;
-    step = 1;
+  first_row = data->id * height / number_of_threads;
+  last_row = (data->id + 1) * height / number_of_threads;
+
+  for (row = first_row; row < last_row; row++) {
+    calculate_row(row);
   }
 
-  for (row = first_row; row < last_row; row += step) {
+  return NULL;
+}
+
+void *pthread_worker_interleaved(void *argument) {
+  ThreadData *data = argument;
+  int row;
+
+  for (row = data->id; row < height; row += number_of_threads) {
     calculate_row(row);
   }
 
@@ -132,6 +134,7 @@ int calculate_pthreads(int interleaved) {
   pthread_t *threads;
   ThreadData *data;
   int created = 0;
+  int create_result;
   int success = 1;
   int i;
 
@@ -153,9 +156,16 @@ int calculate_pthreads(int interleaved) {
 
   for (i = 0; i < number_of_threads; i++) {
     data[i].id = i;
-    data[i].interleaved = interleaved;
 
-    if (pthread_create(&threads[i], NULL, pthread_worker, &data[i]) != 0) {
+    if (interleaved) {
+      create_result = pthread_create(&threads[i], NULL,
+                                     pthread_worker_interleaved, &data[i]);
+    } else {
+      create_result =
+          pthread_create(&threads[i], NULL, pthread_worker_blocks, &data[i]);
+    }
+
+    if (create_result != 0) {
       save_error("Erro ao criar uma thread.");
       success = 0;
       break;
