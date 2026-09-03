@@ -1,0 +1,245 @@
+Script started on Wed Sep  2 21:11:04 2026
+Command: bash roda-tudo.sh
+
+$ date
+Wed Sep  2 21:11:04 -03 2026
+
+$ whoami
+murilocosta
+
+$ pwd
+/Users/murilocosta/Documents/01_college/3nd/infra-so/cmocf-mandelbrot
+
+
+$ ls
+evidencias.log	Makefile	mandelbrot.c	notes		README.md	roda-tudo.sh
+
+$ cc --version
+Apple clang version 21.0.0 (clang-2100.1.1.101)
+Target: arm64-apple-darwin25.6.0
+Thread model: posix
+InstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+
+$ sysctl -n hw.ncpu
+10
+
+$ git log --oneline | cat
+5ccbd42 refactor: separate pthread worker strategies
+7895e2a build add simple makefile
+7e69855 feat record implementation execution times
+59dd9b5 feat: add interleaved Pthreads renderer
+dfa8c6e feat: add block-based Pthreads renderer
+c8dc65c feat: add OpenMP Mandelbrot renderer
+6b66773 feat: implement serial Mandelbrot renderer
+bf8bee2 refactor: centralize input validation and error logging
+354cdf8 feat: allocate pixel buffer and validate malloc failure
+94113c2 chore: remove unused header file
+f3d22b2 chore: update gitignore
+81c151f docs(readme): add readme
+0e7a991 chore: update gitignore
+2a0768b feat: validates and parses the input arguments.
+11ed379 feat: add .h of mandelbrot.c struct
+61fcef2 Initial commit
+
+$ make clean
+rm -f mandelbrot mandelbrot_cmocf_*.pgm times.txt errors.txt
+
+$ make CC=/opt/homebrew/opt/llvm/bin/clang
+/opt/homebrew/opt/llvm/bin/clang -std=c11 -Wall -Wextra -O2 -fopenmp -pthread -DLOGIN='"cmocf"' mandelbrot.c -o mandelbrot
+
+
+$ ./mandelbrot 800 800 1000 4; echo "rc=$?"
+rc=0
+
+$ cat times.txt
+Serial: 0.227072001 segundos
+OpenMP: 0.095518112 segundos
+Pthreads 1: 0.099944830 segundos
+Pthreads 2: 0.067553043 segundos
+
+$ cat errors.txt
+
+$ md5 mandelbrot_cmocf_*.pgm
+MD5 (mandelbrot_cmocf_openmp.pgm) = 90ca8222a855d36ee869d155019e2a6b
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 90ca8222a855d36ee869d155019e2a6b
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 90ca8222a855d36ee869d155019e2a6b
+MD5 (mandelbrot_cmocf_serial.pgm) = 90ca8222a855d36ee869d155019e2a6b
+
+$ head -c 60 mandelbrot_cmocf_serial.pgm; echo
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+$ wc -l mandelbrot_cmocf_serial.pgm
+     800 mandelbrot_cmocf_serial.pgm
+
+$ head -1 mandelbrot_cmocf_serial.pgm | wc -w
+     800
+
+$ tr ' ' '\n' < mandelbrot_cmocf_serial.pgm | sort -n | head -1
+0
+
+$ tr ' ' '\n' < mandelbrot_cmocf_serial.pgm | sort -n | tail -1
+255
+
+
+$ ./mandelbrot ; echo "rc=$?"; cat errors.txt
+rc=1
+Uso: mandelbrot largura altura max_iteracoes num_threads
+
+$ ./mandelbrot 800; echo "rc=$?"; cat errors.txt
+rc=1
+Uso: mandelbrot largura altura max_iteracoes num_threads
+
+$ ./mandelbrot 800 800 1000; echo "rc=$?"; cat errors.txt
+rc=1
+Uso: mandelbrot largura altura max_iteracoes num_threads
+
+$ ./mandelbrot 800 800 1000 4 5; echo "rc=$?"; cat errors.txt
+rc=1
+Uso: mandelbrot largura altura max_iteracoes num_threads
+
+$ ./mandelbrot -1 800 1000 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 800 0 1000 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 800 800 0 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 800 800 1000 0; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot abc 800 1000 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 800 800 1000 xyz; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 12.5 800 1000 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 99999999999 800 1000 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro: os quatro argumentos devem ser inteiros positivos.
+
+$ ./mandelbrot 2147483647 2147483647 10 4; echo "rc=$?"; cat errors.txt
+rc=1
+Erro ao alocar memoria para a imagem.
+
+===== ERRO NA CRIACAO DO ARQUIVO DE SAIDA =====
+
+$ mkdir -p sem_permissao && cp mandelbrot sem_permissao/ && chmod 555 sem_permissao
+
+$ cd sem_permissao && ./mandelbrot 50 50 50 2; echo "rc=$?"; cd ..
+rc=1
+
+$ chmod 755 sem_permissao && rm -rf sem_permissao
+
+
+$ ./mandelbrot 1 1 100 4; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 26ab0db90d72e28ad0ba1e22ee510510
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 26ab0db90d72e28ad0ba1e22ee510510
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 26ab0db90d72e28ad0ba1e22ee510510
+MD5 (mandelbrot_cmocf_serial.pgm) = 26ab0db90d72e28ad0ba1e22ee510510
+
+$ ./mandelbrot 1 600 100 8; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 89765af10e559d9a671d724529969fa6
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 89765af10e559d9a671d724529969fa6
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 89765af10e559d9a671d724529969fa6
+MD5 (mandelbrot_cmocf_serial.pgm) = 89765af10e559d9a671d724529969fa6
+
+$ ./mandelbrot 600 1 100 8; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 003b88598856b82b12cd9e176eb44339
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 003b88598856b82b12cd9e176eb44339
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 003b88598856b82b12cd9e176eb44339
+MD5 (mandelbrot_cmocf_serial.pgm) = 003b88598856b82b12cd9e176eb44339
+
+$ ./mandelbrot 600 600 1 4; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 50ac4f496df96acc82f19594a92d667c
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 50ac4f496df96acc82f19594a92d667c
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 50ac4f496df96acc82f19594a92d667c
+MD5 (mandelbrot_cmocf_serial.pgm) = 50ac4f496df96acc82f19594a92d667c
+
+$ ./mandelbrot 3 7 1000 5; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 74a577d163d1fed0b1fc1b58149bd44b
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 74a577d163d1fed0b1fc1b58149bd44b
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 74a577d163d1fed0b1fc1b58149bd44b
+MD5 (mandelbrot_cmocf_serial.pgm) = 74a577d163d1fed0b1fc1b58149bd44b
+
+$ ./mandelbrot 600 600 500 1; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 90f9439f8c0419746d41b857209ade55
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 90f9439f8c0419746d41b857209ade55
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 90f9439f8c0419746d41b857209ade55
+MD5 (mandelbrot_cmocf_serial.pgm) = 90f9439f8c0419746d41b857209ade55
+
+$ ./mandelbrot 10 10 100 1000; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = 276247869137c4cccf63f35643187902
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = 276247869137c4cccf63f35643187902
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = 276247869137c4cccf63f35643187902
+MD5 (mandelbrot_cmocf_serial.pgm) = 276247869137c4cccf63f35643187902
+
+$ ./mandelbrot 200 200 100 100000; echo "rc=$?"; md5 mandelbrot_cmocf_*.pgm
+rc=0
+MD5 (mandelbrot_cmocf_openmp.pgm) = fb43495dbf7e43be9212b1e879fe9488
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = fb43495dbf7e43be9212b1e879fe9488
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = fb43495dbf7e43be9212b1e879fe9488
+MD5 (mandelbrot_cmocf_serial.pgm) = fb43495dbf7e43be9212b1e879fe9488
+
+$ cat errors.txt
+
+
+$ ./mandelbrot 1000 1000 1500 1; cat times.txt
+Serial: 0.447165012 segundos
+OpenMP: 0.448021889 segundos
+Pthreads 1: 0.446139097 segundos
+Pthreads 2: 0.446887016 segundos
+
+$ ./mandelbrot 1000 1000 1500 2; cat times.txt
+Serial: 0.448622227 segundos
+OpenMP: 0.227741003 segundos
+Pthreads 1: 0.239822149 segundos
+Pthreads 2: 0.239310026 segundos
+
+$ ./mandelbrot 1000 1000 1500 4; cat times.txt
+Serial: 0.458903074 segundos
+OpenMP: 0.234261990 segundos
+Pthreads 1: 0.227048159 segundos
+Pthreads 2: 0.130636930 segundos
+
+$ ./mandelbrot 1000 1000 1500 8; cat times.txt
+Serial: 0.460268974 segundos
+OpenMP: 0.164016008 segundos
+Pthreads 1: 0.182621956 segundos
+Pthreads 2: 0.086377859 segundos
+
+$ md5 mandelbrot_cmocf_*.pgm
+MD5 (mandelbrot_cmocf_openmp.pgm) = cbf5a32ba4edcde42f55072c7f1593d5
+MD5 (mandelbrot_cmocf_pthreads1.pgm) = cbf5a32ba4edcde42f55072c7f1593d5
+MD5 (mandelbrot_cmocf_pthreads2.pgm) = cbf5a32ba4edcde42f55072c7f1593d5
+MD5 (mandelbrot_cmocf_serial.pgm) = cbf5a32ba4edcde42f55072c7f1593d5
+
+$ cat errors.txt
+
+
+$ make clean
+rm -f mandelbrot mandelbrot_cmocf_*.pgm times.txt errors.txt
+
+$ ls
+evidencias.log	Makefile	mandelbrot.c	notes		README.md	roda-tudo.sh
+
+Command exit status: 0
+Script done on Wed Sep  2 21:11:12 2026
