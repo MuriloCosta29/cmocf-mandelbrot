@@ -5,10 +5,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifndef LOGIN
 #define LOGIN "cmocf"
 #endif
+
+#define MAX_THREADS 1024
 
 #define SERIAL_FILE "mandelbrot_" LOGIN "_serial.pgm"
 #define OPENMP_FILE "mandelbrot_" LOGIN "_openmp.pgm"
@@ -65,7 +68,9 @@ int pixel_value(int column, int row) {
 
   while (z_real * z_real + z_imaginary * z_imaginary <= 4.0 &&
          iterations < max_iterations) {
+
     double new_real = z_real * z_real - z_imaginary * z_imaginary + real;
+
     double new_imaginary = 2.0 * z_real * z_imaginary + imaginary;
 
     z_real = new_real;
@@ -80,8 +85,13 @@ void calculate_row(int row) {
   int column;
 
   for (column = 0; column < width; column++) {
+
     image[(size_t)row * width + column] = pixel_value(column, row);
   }
+}
+
+void clear_image(void) {
+  memset(image, 0, (size_t)width * height * sizeof(int));
 }
 
 void calculate_serial(void) {
@@ -105,12 +115,19 @@ void calculate_openmp(void) {
 
 void *pthread_worker_blocks(void *argument) {
   ThreadData *data = argument;
+  int rows_per_thread = height / number_of_threads;
+  int extra_rows = height % number_of_threads;
   int first_row;
   int last_row;
   int row;
 
-  first_row = data->id * height / number_of_threads;
-  last_row = (data->id + 1) * height / number_of_threads;
+  if (data->id < extra_rows) {
+    first_row = data->id * (rows_per_thread + 1);
+    last_row = first_row + rows_per_thread + 1;
+  } else {
+    first_row = extra_rows + data->id * rows_per_thread;
+    last_row = first_row + rows_per_thread;
+  }
 
   for (row = first_row; row < last_row; row++) {
     calculate_row(row);
@@ -197,6 +214,7 @@ int write_image(const char *filename) {
 
   for (row = 0; row < height; row++) {
     for (column = 0; column < width; column++) {
+
       char separator = column == width - 1 ? '\n' : ' ';
 
       if (fprintf(file, "%d%c", image[(size_t)row * width + column],
@@ -223,6 +241,7 @@ int main(int argc, char *argv[]) {
 
   error_file = fopen("errors.txt", "w");
   if (error_file == NULL) {
+
     return EXIT_FAILURE;
   }
 
@@ -238,6 +257,13 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  if (number_of_threads > height) {
+    number_of_threads = height;
+  }
+  if (number_of_threads > MAX_THREADS) {
+    number_of_threads = MAX_THREADS;
+  }
+
   if ((size_t)width > SIZE_MAX / sizeof(int) / (size_t)height) {
     save_error("Erro: as dimensoes da imagem sao muito grandes.");
     return EXIT_FAILURE;
@@ -249,6 +275,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  clear_image();
   start = omp_get_wtime();
   calculate_serial();
   times[0] = omp_get_wtime() - start;
@@ -257,6 +284,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  clear_image();
   start = omp_get_wtime();
   calculate_openmp();
   times[1] = omp_get_wtime() - start;
@@ -265,6 +293,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  clear_image();
   start = omp_get_wtime();
   if (!calculate_pthreads(0)) {
     free(image);
@@ -276,6 +305,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  clear_image();
   start = omp_get_wtime();
   if (!calculate_pthreads(1)) {
     free(image);
